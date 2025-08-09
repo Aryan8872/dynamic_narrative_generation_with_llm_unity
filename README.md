@@ -2,6 +2,8 @@
 
 A dynamic narrative engine that uses LLMs to generate branching stories with persistent NPC relationships and moral consequences. Built for easy integration with Unity and optimized for local model usage with LM Studio.
 
+> Note: This repository is an active prototype for research/education. Interfaces and prompts may evolve.
+
 ## Features
 
 - **Dynamic Story Generation**: LLM-powered branching narratives that adapt to player choices
@@ -117,6 +119,12 @@ Response: {
 3. **Set API URL** (default: http://localhost:5000)
 4. **Run the game** - it will automatically start a new story
 
+#### NPC Auto-Detect (no manual wiring)
+
+- `Assets/FlaskDialogueConnector.cs` auto-detects the NPC you're looking at via camera raycast and a proximity fallback.
+- If `playerCamera` isn't assigned, it uses `Camera.main` automatically.
+- Ensure your NPCs have a Collider and `FlaskChatConnector` with `botName` set.
+
 ### Key Scripts
 
 - `NarrativeManager.cs` - Main controller for story interaction
@@ -162,6 +170,44 @@ Each NPC has emotional states (0.0 to 1.0):
 - **Long-term**: Summarized key events every 4 interactions
 - **Context Window**: Optimized for LLM token limits
 
+## Immersive Techniques Used
+
+- **Per-NPC Personas & Memory**: Backend `npc_profiles` and short `npc_memories` inject role, tone, and recent dialogue for stable character voices.
+- **World-State Prompting**: Player metrics, NPC states, and objective are embedded into prompts for coherent, reactive narrative beats.
+- **Diegetic Constraints**: Prompts instruct models to respond strictly as the addressed NPC, reducing cross-talk and preserving immersion.
+- **Automatic NPC Identification**: Unity camera-based detection ties the player’s gaze/focus to the backend’s narrative persona selection.
+- **Periodic Summarization**: Story memory is condensed every few turns to maintain continuity within model context windows.
+
+## Ethical Considerations
+
+- **Local-Only Inference**: Runs via LM Studio on-device to reduce data exposure and support privacy.
+- **Player Agency & Transparency**: README and UI messaging clarify that dialogue is AI-generated and may be imperfect.
+- **Content Controls (Configurable)**: While the prototype disables filtering for research, the backend is structured so filters can be re-enabled or customized.
+- **Bias & Safety Awareness**: Prompts and personas avoid harmful stereotypes; users are encouraged to review/curate NPC profiles.
+- **Logging & Debugging**: Minimal PII; logs focus on system state and errors for responsible iteration.
+
+## Advantages
+
+- **Plug-and-Play with Unity**: Minimal wiring; camera auto-detects NPCs.
+- **Consistent Characterization**: Persona + memory yields stable voices and relationships.
+- **Scalable Story Control**: Centralized backend manages objectives, state, and memory.
+- **Runs Offline**: Works with local models; no external API dependency required.
+
+## Fun Factor & Engagement
+
+- **Reactive NPCs**: Characters remember what you said and react accordingly.
+- **Emergent Play**: Open-ended prompts enable creative solutions beyond fixed dialogue trees.
+- **Diegetic Discovery**: Finding the right NPC and persuading them becomes a gameplay loop.
+
+## Future Improvements
+
+- **Richer Long-Term Memory**: Per-NPC episodic memory with time decay and summarization by theme.
+- **Toolformer Actions**: Let NPCs trigger in-game actions (unlock doors, modify quest flags) via validated action schemas.
+- **Better JSON Robustness**: Stricter JSON schemas and validation feedback loops.
+- **Dynamic Persona Tuning**: Adapt personalities based on arc outcomes and relationship trajectories.
+- **Multimodal Cues**: Use gaze, proximity, and audio cues to modulate NPC response emotion.
+- **Authoring Tools**: GUI to edit personas, objectives, and narrative rails without code.
+
 ## Development
 
 ### Project Structure
@@ -190,30 +236,6 @@ Each NPC has emotional states (0.0 to 1.0):
 2. **Unity Testing**: Use the built-in test functions in NarrativeManager
 3. **LM Studio Testing**: Use `/test-lm` endpoint
 
-## Troubleshooting
-
-### Common Issues
-
-1. **LM Studio Connection Failed**:
-   - Ensure LM Studio is running on localhost:1234
-   - Check if DeepSeek model is loaded
-   - Verify API server is accessible
-
-2. **Unity Connection Issues**:
-   - Check firewall settings
-   - Verify API server is running
-   - Test with `test_client.py` first
-
-3. **JSON Parse Errors**:
-   - LM Studio may return malformed JSON
-   - System includes fallback responses
-   - Check LM Studio model quality
-
-4. **Memory Issues**:
-   - Long stories may exceed context limits
-   - Summarization happens every 4 interactions
-   - Consider reducing story complexity
-
 ### Performance Tips
 
 1. **Local Models**: Use smaller models for faster responses
@@ -231,4 +253,4 @@ Based on the research and concepts from:
 - GENEVA: Branching narrative generation with GPT-4
 - WHAT-IF: Meta-prompting for interactive fiction
 - Cross-platform NPC systems with persistent memory
-- Game design principles for meaningful decisions 
+- Game design principles for meaningful decisions
