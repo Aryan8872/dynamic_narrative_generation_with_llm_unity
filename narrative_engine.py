@@ -52,7 +52,22 @@ class NarrativeEngine:
             "depressed villager": "Worn Survivor",
             "knight in training farmer jitt": "Rookie Runner"
         }
-        
+        # NPC profiles for consistent persona and relationship (keys lowercased)
+        self.npc_profiles: Dict[str, Dict[str, str]] = {
+            "guardofrock": {"backend_name": "Guard_of_Rock", "role": "Hint", "personality": "Gruff, cautious, distrusts outsiders, loyal to the castle", "relationship": "Neutral, suspicious until proven trustworthy"},
+            "rock guard": {"backend_name": "Guard_of_Rock", "role": "Hint", "personality": "Gruff, cautious, distrusts outsiders, loyal to the castle", "relationship": "Neutral, suspicious until proven trustworthy"},
+            "shopkeeper": {"backend_name": "Shopkeeper", "role": "Side", "personality": "Pragmatic, slightly greedy, talkative", "relationship": "Friendly if you have coin"},
+            "castleguard": {"backend_name": "Castle_Guard", "role": "FinalGatekeeper", "personality": "Disciplined, by-the-book soldier, loyal to orders", "relationship": "Neutral, blocks you without password"},
+            "castle guard": {"backend_name": "Castle_Guard", "role": "FinalGatekeeper", "personality": "Disciplined, by-the-book soldier, loyal to orders", "relationship": "Neutral, blocks you without password"},
+            "depressed villager": {"backend_name": "Villager_Depressed", "role": "Side", "personality": "Melancholic, bitter about life, cynical", "relationship": "Distant, sees player as another passerby"},
+            "knight in training": {"backend_name": "Knight_in_Training", "role": "Hint", "personality": "Eager, naive, dreams of heroism", "relationship": "Friendly, looks up to player"},
+            "farmer jitt": {"backend_name": "Farmer_Jitt", "role": "Side", "personality": "Simple, cheerful, loves crops and animals", "relationship": "Friendly, harmless"},
+            "sleepy villager": {"backend_name": "Villager_Sleeping", "role": "Side", "personality": "Lazy, grumpy when woken, mutters secrets in sleep", "relationship": "Indifferent, may reveal clues accidentally"},
+            "shady villager": {"backend_name": "Villager_Shady", "role": "Hint", "personality": "Mysterious, sly, speaks in riddles", "relationship": "Suspicious, may help for a price"}
+        }
+        # Per-NPC short memory for tonal continuity
+        self.npc_memories: Dict[str, str] = {}
+
     def call_lm_studio(self, messages: List[Dict[str, str]], max_tokens: int = 500) -> str:
         """
         Call LM Studio API with the DeepSeek model.
@@ -177,9 +192,11 @@ class NarrativeEngine:
             "  \"choices\": array of 3-4 strings\n"
             "}."
         )
-        # Resolve NPC role if provided
+        # Resolve NPC role and persona if provided
         npc_key = (npc or "").strip().lower()
         npc_role = self.npc_remap.get(npc_key, npc.title() if npc else "")
+        persona = self.npc_profiles.get(npc_key)
+        npc_memory = self.npc_memories.get(npc_key, "")
         user_prompt = f"Current story: {self.story_context}\n"
         user_prompt += f"Player metrics: kindness={self.player_metrics['kindness']}, aggression={self.player_metrics['aggression']}, honesty={self.player_metrics['honesty']}\n"
         user_prompt += "NPC states: " + ", ".join([f"{npc}: trust={state['trust']}, anger={state['anger']}, fear={state['fear']}" for npc, state in self.npc_states.items()]) + "\n"
@@ -188,6 +205,17 @@ class NarrativeEngine:
         if npc_role:
             user_prompt += f"Interacting with: {npc_role}.\n"
             user_prompt += f"Objective: {self.objective_text}.\n"
+            # Inject persona if known
+            if persona:
+                user_prompt += (
+                    f"NPC persona — name: {npc.title()}, role: {persona['role']}, personality: {persona['personality']}, relationship to Joel: {persona['relationship']}.\n"
+                )
+            # Include brief NPC memory to keep continuity
+            if npc_memory:
+                user_prompt += f"NPC memory (recent): {npc_memory}\n"
+            user_prompt += (
+                "Respond ONLY as this NPC in npc_dialogues. Do not have Ellie or other characters speak unless Joel explicitly addresses them.\n"
+            )
             user_prompt += (
                 "When producing npc_dialogues, keep lines short and in character: \n"
                 "- 'Worn Survivor': subdued, weary tone.\n"
@@ -278,11 +306,46 @@ class NarrativeEngine:
             
             self.story_context += response_data['story_segment']
             self.story_history.append(response_data['story_segment'])
-            for npc, dialogue in response_data['npc_dialogues'].items():
+            for npc_name, dialogue in response_data['npc_dialogues'].items() if isinstance(response_data.get('npc_dialogues'), dict) else []:
                 # Update NPC states based on dialogue
                 if "angry" in dialogue:
-                    self.npc_states[npc]['anger'] += 0.1
+                    self.npc_states[npc_name]['anger'] += 0.1
                 # Add more rules as needed
+            # Append to per-NPC memory (if an npc was targeted)
+            npc_key = (npc or "").strip().lower()
+            if npc_key:
+                mem = self.npc_memories.get(npc_key, "")
+                appended = ""
+                # Support both dict and list shapes for npc_dialogues
+                nd = response_data.get('npc_dialogues', {})
+                if isinstance(nd, dict):
+                    # Try to prefer exact key match, else any line
+                    if npc in nd:
+                        appended = nd[npc]
+                    else:
+                        # Take first dialogue line
+                        try:
+                            appended = next(iter(nd.values()))
+                        except StopIteration:
+                            appended = ""
+                elif isinstance(nd, list):
+                    # Format: [{"npc_name": ..., "dialogue": ...}, ...]
+                    for item in nd:
+                        try:
+                            if str(item.get('npc_name', '')).strip().lower() == npc_key:
+                                appended = str(item.get('dialogue', ''))
+                                break
+                        except Exception:
+                            pass
+                    if not appended and nd:
+                        try:
+                            appended = str(nd[0].get('dialogue', ''))
+                        except Exception:
+                            appended = ""
+                if appended:
+                    mem = (mem + " " + appended).strip()
+                    # Keep last ~500 chars for brevity
+                    self.npc_memories[npc_key] = mem[-500:]
             # Summarize memory periodically
             self.interaction_count += 1
             if self.interaction_count % 4 == 0:
@@ -333,6 +396,8 @@ class NarrativeEngine:
         self.interaction_count = 0
         self.story_beats = []
         self.current_beat_index = 0
+        # Reset per-NPC memories
+        self.npc_memories = {}
         
         if self.story_mode == "tlou":
             self._load_tlou_beats()
