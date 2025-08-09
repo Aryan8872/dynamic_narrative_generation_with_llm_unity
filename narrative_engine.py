@@ -41,13 +41,8 @@ class NarrativeEngine:
         self.story_beats: List[str] = []
         self.current_beat_index: int = 0
         
-        # Content filtering for ethical responses
-        self.inappropriate_keywords = [
-            'vagina', 'penis', 'sex', 'sexual', 'nude', 'naked', 'lick', 'suck', 'fuck', 'porn',
-            'breast', 'ass', 'butt', 'dick', 'cock', 'pussy', 'clit', 'orgasm', 'ejaculate',
-            'masturbate', 'foreplay', 'intimate', 'erotic', 'seduce', 'flirt', 'kiss', 'touch',
-            'caress', 'fondle', 'grope', 'penetrate', 'thrust', 'moan', 'scream', 'pleasure'
-        ]
+        # Content filtering disabled
+        self.inappropriate_keywords: List[str] = []
         # Game objective and NPC role remapping
         self.objective_text = "Find the castle password from NPCs and get past the final gate guard."
         self.npc_remap: Dict[str, str] = {
@@ -175,7 +170,6 @@ class NarrativeEngine:
         system_prompt = (
             "You are a story generator for The Last of Us universe. You are Joel, a hardened survivor in a post-apocalyptic world overrun by infected. "
             "You're escorting Ellie, a 14-year-old girl who may hold the key to a cure. The story takes place in the ruins of Boston and beyond. "
-            "IMPORTANT: Keep all content family-friendly and appropriate. Avoid any sexual, vulgar, or inappropriate content. "
             "Return ONLY a single JSON object with no extra text, no explanations, no code fences, and no markdown formatting. "
             "The JSON schema is: {\n"
             "  \"story_segment\": string,\n"
@@ -213,40 +207,12 @@ class NarrativeEngine:
     
     def _is_inappropriate_content(self, text: str) -> bool:
         """Check if the text contains inappropriate content."""
-        if not text:
-            return False
-        text_lower = text.lower()
-        return any(keyword in text_lower for keyword in self.inappropriate_keywords)
+        # Filtering disabled
+        return False
     
     def _filter_inappropriate_response(self, response_data: Dict[str, Any]) -> Dict[str, Any]:
         """Filter out inappropriate content from the response."""
-        if not response_data:
-            return response_data
-            
-        # Check story segment
-        if 'story_segment' in response_data and self._is_inappropriate_content(response_data['story_segment']):
-            response_data['story_segment'] = "The NPC looks uncomfortable and refuses to engage with inappropriate behavior."
-            
-        # Check NPC dialogues
-        if 'npc_dialogues' in response_data and isinstance(response_data['npc_dialogues'], dict):
-            filtered_dialogues = {}
-            for npc, dialogue in response_data['npc_dialogues'].items():
-                if self._is_inappropriate_content(dialogue):
-                    filtered_dialogues[npc] = "I don't appreciate that kind of talk. Please be respectful."
-                else:
-                    filtered_dialogues[npc] = dialogue
-            response_data['npc_dialogues'] = filtered_dialogues
-            
-        # Check choices
-        if 'choices' in response_data and isinstance(response_data['choices'], list):
-            filtered_choices = []
-            for choice in response_data['choices']:
-                if self._is_inappropriate_content(choice):
-                    filtered_choices.append("Apologize for inappropriate behavior")
-                else:
-                    filtered_choices.append(choice)
-            response_data['choices'] = filtered_choices
-            
+        # Filtering disabled: return as-is
         return response_data
 
     def generate_story_response(self, choice: str, npc: str = "") -> Dict[str, Any]:
@@ -268,15 +234,8 @@ class NarrativeEngine:
             return {"story_segment": segment, "npc_dialogues": {}, "choices": []}
 
         # LLM mode
-        # Check if player input is inappropriate
-        if self._is_inappropriate_content(choice):
-            logger.warning(f"Inappropriate content detected in player input: {choice}")
-            return {
-                "story_segment": "The NPC looks uncomfortable and refuses to engage with inappropriate behavior.",
-                "npc_dialogues": {"NPC": "I don't appreciate that kind of talk. Please be respectful."},
-                "choices": ["Apologize for inappropriate behavior", "Leave the area", "Change the subject"]
-            }
-            
+        # Filtering disabled: do not block player input
+        
         prompt = self.construct_prompt(choice, npc)
         raw_response = self.call_lm_studio([
             {"role": "system", "content": prompt['system']},

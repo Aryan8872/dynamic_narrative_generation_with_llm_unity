@@ -33,8 +33,9 @@ public class FlaskDialogueConnector : MonoBehaviour
     public TMP_InputField inputField; // Player input box
     public Button sendButton;         // Send button
     public TextMeshProUGUI dialogueText; // To show story + NPC dialogues
-    public Transform choicesContainer;   // Optional: container for choice buttons
-    public GameObject choiceButtonPrefab; // Optional: prefab for choice buttons
+    // Choices UI disabled: keep fields for compatibility but unused
+    public Transform choicesContainer;   // (unused)
+    public GameObject choiceButtonPrefab; // (unused)
 
     [Header("Backend Settings")]
     public string flaskChoiceUrl = "http://127.0.0.1:5000/choice";
@@ -45,7 +46,7 @@ public class FlaskDialogueConnector : MonoBehaviour
     void Start()
     {
         sendButton.onClick.AddListener(OnSendClicked);
-        dialogueText.text = "Welcome! Type your choice and press Send.";
+        dialogueText.text = "Welcome! Type and press Send.";
     }
 
     void OnSendClicked()
@@ -114,33 +115,12 @@ public class FlaskDialogueConnector : MonoBehaviour
                 dialogueText.text += $"{npcDialogue.npc_name}: {npcDialogue.dialogue}\n";
             }
         }
-
-        ClearChoices();
-
-        if (choicesContainer != null && choiceButtonPrefab != null && response.choices != null)
-        {
-            foreach (var choice in response.choices)
-            {
-                GameObject btnObj = Instantiate(choiceButtonPrefab, choicesContainer);
-                btnObj.GetComponentInChildren<TextMeshProUGUI>().text = choice;
-
-                btnObj.GetComponent<Button>().onClick.AddListener(() =>
-                {
-                    inputField.text = choice;
-                    OnSendClicked();
-                });
-            }
-        }
+        // Choices UI disabled: do not spawn any buttons
     }
 
     void ClearChoices()
     {
-        if (choicesContainer == null) return;
-
-        foreach (Transform child in choicesContainer)
-        {
-            Destroy(child.gameObject);
-        }
+        // No-op since choices UI is disabled
     }
 
     // Call this method when starting interaction with a specific NPC
