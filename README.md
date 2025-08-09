@@ -17,10 +17,44 @@ A dynamic narrative engine that uses LLMs to generate branching stories with per
 ## System Architecture
 
 ```
-[Unity Game Client] ←→ [Flask API Server] ←→ [LM Studio (DeepSeek)]
-                              ↓
-                    [Game State Management]
+┌──────────────────────┐      HTTP (JSON)       ┌──────────────────────────┐
+│  Unity Game Client   │  ───────────────────▶  │   Flask API Server       │
+│  (FlaskDialogueConn) │                         │   (app.py)               │
+└──────────────────────┘                         └─────────────┬────────────┘
+                                                             calls
+                                              ┌────────────────┴────────────────┐
+                                              │     NarrativeEngine (Python)    │
+                                              │  state, memory, prompt builder  │
+                                              └────────────────┬────────────────┘
+                                                             HTTP (OpenAI compat)
+                                              ┌────────────────┴────────────────┐
+                                              │         LM Studio Server        │
+                                              │   model router / host runtime   │
+                                              └───────────┬───────────┬─────────┘
+                                                          │           │
+                                                (DeepSeek family)   (Google Gemma)
 ```
+
+- The backend talks to LM Studio via the OpenAI-compatible `/v1/chat/completions` API.
+- You can run multiple models in LM Studio (e.g., DeepSeek + Google Gemma) and select which one to use at runtime.
+
+### Selecting the model (LM Studio)
+
+- Set the environment variable before starting the API:
+
+```powershell
+# Windows PowerShell example
+$env:LMSTUDIO_MODEL = "gemma-7b-it-q4"   # or the exact model name LM Studio shows
+python app.py
+```
+
+```bash
+# macOS/Linux example
+export LMSTUDIO_MODEL="gemma-7b-it-q4"   # or deepseek-r1:latest, etc.
+python app.py
+```
+
+- If not set, the backend defaults to `local` (LM Studio's default model). Ensure the name matches what LM Studio lists in the model dropdown.
 
 ## Quick Start
 
@@ -142,11 +176,16 @@ The system expects LM Studio to be running on `http://localhost:1234`. To change
 
 ### Model Configuration
 
-The system is optimized for DeepSeek models but works with any chat-completion model. Key settings:
+The system works with any chat-completion model exposed by LM Studio (e.g., DeepSeek, Google Gemma). Key settings:
 
 - **Temperature**: 0.7 (balanced creativity/consistency)
 - **Max Tokens**: 800 (for story responses)
 - **Format**: JSON responses for structured output
+
+Tips for Gemma and other models:
+- Use instruction-tuned variants (e.g., `-it`) for best dialogue adherence.
+- If JSON formatting drifts, lower temperature (e.g., 0.2–0.4) or add stronger JSON enforcement in prompts.
+- Bigger models improve coherence but increase latency; adjust `max_tokens` accordingly.
 
 ## Game Mechanics
 
